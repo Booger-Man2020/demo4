@@ -12,6 +12,7 @@ import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
 import java.util.*;
 
 public class NioServer {
@@ -37,7 +38,7 @@ public class NioServer {
     public void run() throws Exception {
         while (true) {
             if (selector.select(1000) == 0) {
-                System.out.println("Сервер ждет ");
+            //    System.out.println("Сервер ждет ");
                 continue;
             }
 
@@ -51,10 +52,6 @@ public class NioServer {
                 }
                 if (key.isReadable()) {
                     handleRead(key);
-//                    SocketChannel sc = (SocketChannel) key.channel();
-//                    ByteBuffer buffer = (ByteBuffer) key.attachment();
-//                    sc.read(buffer);
-//                    System.out.println("Сервер получает сообщение клиента:");
 
                 }
 
@@ -87,34 +84,40 @@ public class NioServer {
         }
         byte[] mess = s.toString().getBytes(StandardCharsets.UTF_8);
         channel.write(ByteBuffer.wrap(mess));
-        String message =new String(mess);
-        String [] message1= message.split("\r");
-        String [] message2= message.split(" ");
+        String message =new String(mess); // из терминала строка(команда)
+        String [] message1= message.split("\r"); // выделяем из строки команду
+        String [] message2= message.split(" "); // выделяем из строки имя файла
 
 
-        if (message1[0].equals(ls)) {
+        if (message1[0].equals(ls)) { // чтение списка файлов из папки записываем в лист выводим и чистим лист чтобы не дублировать
            list.addAll(getFiles(homeDir));
            byte[] mess1 = list.toString().getBytes(StandardCharsets.UTF_8);
             channel.write(ByteBuffer.wrap(mess1));
+            list.clear();
 
-        }else if (message2[0].equals(catFile)){
-            String [] mess2 = message2[1].split("\r");
-            try(FileReader reader = new FileReader(mess2[0])) {
+        }else if (message2[0].equals(catFile)){  // чтение файла
+
+            String [] mess2 = message2[1].split("\r");  //имя файла, почемуто записывает /r и надо его убрать
+            File toRead = Path.of(homeDir).resolve(mess2[0]).toFile();
+            try(FileReader reader = new FileReader(toRead)) {
             // читаем посимвольно
-                char[] buf = new char[256];
                 int c;
-                while((c = reader.read(buf))>0){
+                while((c=reader.read())!=-1){
+                    ArrayList<Character> file = new ArrayList<>();
+                    file.add((char) c);
 
-                    if(c < 256){
-                        buf = Arrays.copyOf(buf, c);
-                    }
-
-                byte[] file = buf.toString().getBytes(StandardCharsets.UTF_8);
-         channel.write(ByteBuffer.wrap(file));
+                byte[] buf = file.toString().getBytes(StandardCharsets.UTF_8);
+         channel.write(ByteBuffer.wrap(buf));
 
         }
 
-    }}}
+    } catch (Exception e){
+                e.printStackTrace();
+                String error = "файл не найден";
+                byte[] err = error.toString().getBytes(StandardCharsets.UTF_8);
+                channel.write(ByteBuffer.wrap(err));
+            }
+        }}
 
 
 
